@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Phone, Calendar, DollarSign, UserPlus, StickyNote, Users, RefreshCw } from "lucide-react";
+import { Plus, CreditCard as Edit, Trash2, Phone, Calendar, DollarSign, UserPlus, StickyNote, Users, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
