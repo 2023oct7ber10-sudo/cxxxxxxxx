@@ -3,11 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Phone, Calendar, DollarSign, UserPlus, StickyNote, Users } from "lucide-react";
+import { Plus, Edit, Trash2, Phone, Calendar, DollarSign, UserPlus, StickyNote, Users, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface Customer {
   id: number;
@@ -46,6 +47,9 @@ export const CustomerTable = ({ onAddCustomer, onAddBulkCustomers, onBulkEdit, o
   const [loading, setLoading] = useState(true);
   const [editingNote, setEditingNote] = useState<{ id: number; note: string } | null>(null);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [deleteCustomerId, setDeleteCustomerId] = useState<number | null>(null);
+  const [deleteNoteCustomerId, setDeleteNoteCustomerId] = useState<number | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -101,8 +105,9 @@ export const CustomerTable = ({ onAddCustomer, onAddBulkCustomers, onBulkEdit, o
         .eq('id', id);
 
       if (error) throw error;
-      
+
       setCustomers(customers.filter(c => c.id !== id));
+      setDeleteCustomerId(null);
       toast({
         title: "تم بنجاح",
         description: "تم حذف العميل بنجاح",
@@ -114,6 +119,65 @@ export const CustomerTable = ({ onAddCustomer, onAddBulkCustomers, onBulkEdit, o
         description: `فشل في حذف العميل: ${error.message}`,
         variant: "destructive",
       });
+    }
+  };
+
+  const deleteCustomerNote = async (customerId: number) => {
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({ notes: null })
+        .eq('id', customerId);
+
+      if (error) throw error;
+
+      setCustomers(customers.map(c =>
+        c.id === customerId ? { ...c, notes: null } : c
+      ));
+
+      setDeleteNoteCustomerId(null);
+      toast({
+        title: "تم بنجاح",
+        description: "تم حذف الملاحظة بنجاح",
+      });
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      toast({
+        title: "خطأ",
+        description: `فشل في حذف الملاحظة: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const resetMonthlyPrices = async () => {
+    setIsResetting(true);
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({
+          monthly_price: 0,
+          payment_status: 'لم يدفع',
+          renewal_status: 'لم يتم'
+        });
+
+      if (error) throw error;
+
+      await fetchCustomers();
+
+      toast({
+        title: "تم بنجاح",
+        description: "تم إعادة تعيين السعر الشهري لجميع العملاء",
+      });
+    } catch (error) {
+      console.error('Error resetting monthly prices:', error);
+      toast({
+        title: "خطأ",
+        description: `فشل في إعادة تعيين الأسعار: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -244,6 +308,28 @@ export const CustomerTable = ({ onAddCustomer, onAddBulkCustomers, onBulkEdit, o
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">قائمة العملاء</h2>
         <div className="flex gap-2">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" className="hover-scale" disabled={isResetting}>
+                <RefreshCw className={`h-4 w-4 ml-2 ${isResetting ? 'animate-spin' : ''}`} />
+                إعادة تعيين الشهر
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                <AlertDialogDescription className="text-right">
+                  سيتم إعادة تعيين السعر الشهري وحالة الدفع وحالة التجديد لجميع العملاء. هذا الإجراء سيؤثر على جميع السجلات.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={resetMonthlyPrices} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  تأكيد
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button onClick={onBulkEdit} variant="outline" className="hover-scale">
             <Users className="h-4 w-4 ml-2" />
             تعديل جماعي
@@ -390,6 +476,39 @@ export const CustomerTable = ({ onAddCustomer, onAddBulkCustomers, onBulkEdit, o
                           className="min-h-[100px] text-right"
                         />
                         <div className="flex gap-2 justify-end">
+                          {customer.notes && (
+                            <AlertDialog open={deleteNoteCustomerId === customer.id} onOpenChange={(open) => !open && setDeleteNoteCustomerId(null)}>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="destructive"
+                                  onClick={() => setDeleteNoteCustomerId(customer.id)}
+                                >
+                                  حذف
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>حذف الملاحظة</AlertDialogTitle>
+                                  <AlertDialogDescription className="text-right">
+                                    هل أنت متأكد من حذف هذه الملاحظة؟ لا يمكن التراجع عن هذا الإجراء.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => {
+                                      deleteCustomerNote(customer.id);
+                                      setEditingNote(null);
+                                      setNoteDialogOpen(false);
+                                    }}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    حذف
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                           <Button
                             variant="outline"
                             onClick={() => {
@@ -423,14 +542,35 @@ export const CustomerTable = ({ onAddCustomer, onAddBulkCustomers, onBulkEdit, o
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => deleteCustomer(customer.id)}
-                      className="h-8 w-8 text-destructive hover:text-destructive hover-scale"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <AlertDialog open={deleteCustomerId === customer.id} onOpenChange={(open) => !open && setDeleteCustomerId(null)}>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setDeleteCustomerId(customer.id)}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover-scale"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>حذف العميل</AlertDialogTitle>
+                          <AlertDialogDescription className="text-right">
+                            هل أنت متأكد من حذف العميل "{customer.customer_name}"؟ لا يمكن التراجع عن هذا الإجراء.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteCustomer(customer.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            حذف
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </TableCell>
               </TableRow>
