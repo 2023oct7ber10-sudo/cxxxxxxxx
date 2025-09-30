@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Users, DollarSign, CheckCircle, AlertCircle, Plus, Trash2, Edit, ChevronDown, ChevronUp } from "lucide-react";
+import { Users, DollarSign, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Plus, Trash2, CreditCard as Edit, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
