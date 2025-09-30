@@ -159,7 +159,8 @@ export const CustomerTable = ({ onAddCustomer, onAddBulkCustomers, onBulkEdit, o
           monthly_price: 0,
           payment_status: 'لم يدفع',
           renewal_status: 'لم يتم'
-        });
+        })
+        .neq('id', 0);
 
       if (error) throw error;
 
