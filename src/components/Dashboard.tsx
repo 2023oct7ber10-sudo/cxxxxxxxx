@@ -3,10 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Users, DollarSign, CheckCircle, AlertCircle, Plus, Trash2 } from "lucide-react";
+import { Users, DollarSign, CheckCircle, AlertCircle, Plus, Trash2, Edit, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface DashboardStats {
   totalCustomers: number;
@@ -33,6 +34,9 @@ export const Dashboard = () => {
   const [newNote, setNewNote] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [loadingNotes, setLoadingNotes] = useState(true);
+  const [editingNote, setEditingNote] = useState<{id: string, content: string} | null>(null);
+  const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
+  const [showNotes, setShowNotes] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -121,6 +125,33 @@ export const Dashboard = () => {
     }
   };
 
+  const updateNote = async (noteId: string, content: string) => {
+    if (!content.trim()) return;
+
+    try {
+      const { error } = await supabase
+        .from('admin_notes')
+        .update({ note_content: content.trim() })
+        .eq('id', noteId);
+
+      if (error) throw error;
+
+      setEditingNote(null);
+      fetchAdminNotes();
+      toast({
+        title: "تم بنجاح",
+        description: "تم تحديث الملاحظة بنجاح",
+      });
+    } catch (error) {
+      console.error('Error updating note:', error);
+      toast({
+        title: "خطأ",
+        description: `فشل في تحديث الملاحظة: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  };
+
   const deleteNote = async (noteId: string) => {
     try {
       const { error } = await supabase
@@ -130,6 +161,7 @@ export const Dashboard = () => {
 
       if (error) throw error;
 
+      setDeleteNoteId(null);
       fetchAdminNotes();
       toast({
         title: "تم بنجاح",
@@ -215,8 +247,12 @@ export const Dashboard = () => {
       {/* ملاحظات المدير */}
       <Card className="animate-scale-in bg-black/80 text-white border-gray-600">
         <CardHeader>
-          <CardTitle className="text-center">ملاحظات المدير</CardTitle>
+          <CardTitle className="flex items-center justify-between cursor-pointer" onClick={() => setShowNotes(!showNotes)}>
+            <span>ملاحظات المدير ({adminNotes.length})</span>
+            {showNotes ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </CardTitle>
         </CardHeader>
+        {showNotes && (
         <CardContent className="space-y-4">
           {/* إضافة ملاحظة جديدة */}
           <div className="space-y-2">
@@ -253,34 +289,95 @@ export const Dashboard = () => {
               adminNotes.map((note) => (
                 <Card key={note.id} className="bg-gray-800/50 border-gray-600">
                   <CardContent className="p-4">
-                    <div className="flex justify-between items-start gap-3">
-                      <div className="flex-1">
-                        <p className="text-white text-right mb-2">{note.note_content}</p>
-                        <p className="text-xs text-gray-400">
-                          {new Date(note.created_at).toLocaleDateString('ar-EG', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
+                    {editingNote?.id === note.id ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={editingNote.content}
+                          onChange={(e) => setEditingNote({ ...editingNote, content: e.target.value })}
+                          className="bg-gray-700/50 border-gray-500 text-white text-right"
+                          rows={3}
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingNote(null)}
+                            className="text-gray-400 hover:text-gray-300"
+                          >
+                            إلغاء
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => updateNote(note.id, editingNote.content)}
+                            className="text-green-400 hover:text-green-300"
+                          >
+                            حفظ
+                          </Button>
+                        </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteNote(note.id)}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    ) : (
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="flex-1">
+                          <p className="text-white text-right mb-2">{note.note_content}</p>
+                          <p className="text-xs text-gray-400">
+                            {new Date(note.created_at).toLocaleDateString('ar-EG', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingNote({ id: note.id, content: note.note_content })}
+                            className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog open={deleteNoteId === note.id} onOpenChange={(open) => !open && setDeleteNoteId(null)}>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeleteNoteId(note.id)}
+                                className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>حذف الملاحظة</AlertDialogTitle>
+                                <AlertDialogDescription className="text-right">
+                                  هل أنت متأكد من حذف هذه الملاحظة؟ لا يمكن التراجع عن هذا الإجراء.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteNote(note.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  حذف
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))
             )}
           </div>
         </CardContent>
+        )}
       </Card>
 
       <div className="grid gap-6 md:grid-cols-2">

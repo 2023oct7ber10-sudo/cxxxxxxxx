@@ -85,7 +85,6 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
         if (username) {
           isValid = true;
           actualUsername = await getDisplayNameForSingleUser(username);
-          actualUsername = username;
         }
       }
 
